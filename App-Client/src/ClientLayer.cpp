@@ -148,6 +148,7 @@ void ClientLayer::UI_ClientList()
 		if (username.empty())
 			continue;
 
+		ImGui::PushStyleColor(ImGuiCol_Text, ImColor(clientInfo.Color).Value);
 		if (ImGui::Selectable(username.c_str(), selected == username)) {
 			if (selected == username)
 				selected = "";
@@ -158,6 +159,7 @@ void ClientLayer::UI_ClientList()
 				selected = username;
 			}
 		}
+		ImGui::PopStyleColor();
 	}
 	ImGui::End();
 }
