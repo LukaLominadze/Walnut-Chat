@@ -21,7 +21,9 @@ project "App-Server-Headless"
 
       -- Walnut-Networking
       "../Walnut/Walnut-Modules/Walnut-Networking/Source",
-      "../Walnut/Walnut-Modules/Walnut-Networking/vendor/GameNetworkingSockets/include"
+      "../Walnut/Walnut-Modules/Walnut-Networking/vendor/GameNetworkingSockets/include",
+
+      "../vendor/curl/include"
 
    }
 
@@ -44,34 +46,52 @@ project "App-Server-Headless"
 
    filter "system:windows"
       systemversion "latest"
-      defines { "WL_PLATFORM_WINDOWS" }
+      defines { "WL_PLATFORM_WINDOWS", "WL_HEADLESS" }
 
       postbuildcommands 
 	  {
 	    '{COPY} "../%{WalnutNetworkingBinDir}/GameNetworkingSockets.dll" "%{cfg.targetdir}"',
 	    '{COPY} "../%{WalnutNetworkingBinDir}/libcrypto-3-x64.dll" "%{cfg.targetdir}"',
 	    '{COPY} "../%{WalnutNetworkingBinDir}/libprotobufd.dll" "%{cfg.targetdir}"',
+       "{COPYDIR} %{wks.location}/vendor/curl/bin/libcurl.dll ../bin/" .. outputdir .. "/%{prj.name}/",
+       "{COPYDIR} %{wks.location}/vendor/curl/bin/zlib1.dll ../bin/" .. outputdir .. "/%{prj.name}/"
 	  }
 
    filter "system:linux"
       libdirs { "../Walnut/Walnut-Networking/vendor/GameNetworkingSockets/bin/Linux" }
       links { "GameNetworkingSockets" }
 
-       defines { "WL_HEADLESS" }
-
    filter "configurations:Debug"
       defines { "WL_DEBUG" }
+      postbuildcommands 
+	  {
+	    '{COPY} "../%{WalnutNetworkingBinDir}/libprotobufd.dll" "%{cfg.targetdir}"'
+	  }
       runtime "Debug"
       symbols "On"
 
    filter "configurations:Release"
       defines { "WL_RELEASE" }
+      postbuildcommands 
+	  {
+	    '{COPY} "../%{WalnutNetworkingBinDir}/libprotobuf.dll" "%{cfg.targetdir}"'
+	  }
       runtime "Release"
       optimize "On"
       symbols "On"
 
    filter "configurations:Dist"
       defines { "WL_DIST" }
+      postbuildcommands 
+	  {
+	    '{COPY} "../%{WalnutNetworkingBinDir}/libprotobuf.dll" "%{cfg.targetdir}"'
+	  }
       runtime "Release"
       optimize "On"
       symbols "Off"
+   
+   filter "action:vs*"
+      buildoptions { "/utf-8" }
+
+   filter { "toolset:gcc or toolset:clang" }
+      buildoptions { "-finput-charset=UTF-8" }

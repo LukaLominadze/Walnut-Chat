@@ -2,6 +2,14 @@
 .vs/
 bin/
 bin-int/
+vendor/curl/bin
+vendor/curl/debug
+vendor/curl/include
+vendor/curl/lib
+vendor/curl/share
+vendor/curl/tools
+vendor/vcpkg
+vendor/build
 
 # Files
 *.vcxproj
@@ -9,6 +17,7 @@ bin-int/
 *.vcxproj.filters
 *.sln
 *.log
+App-Client/*.yaml
 
 # Exclude
 !vendor/bin

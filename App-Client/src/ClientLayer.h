@@ -30,24 +30,29 @@ private:
 	void OnDataReceived(const Walnut::Buffer buffer);
 
 	void SendChatMessage(std::string_view message);
+	void SendGetChatHistoryRequest(const std::string& receiver);
 
 private:
 	void SaveConnectionDetails(const std::filesystem::path& filepath);
 	bool LoadConnectionDetails(const std::filesystem::path& filepath);
+	void SaveUserDetails(const std::filesystem::path& filepath);
+	bool LoadUserDetails(const std::filesystem::path& filepath);
 private:
 	std::unique_ptr<Walnut::Client> m_Client;
 	Walnut::UI::Console m_Console{ "Chat" };
 	std::string m_ServerIP;
 	std::filesystem::path m_ConnectionDetailsFilePath = "ConnectionDetails.yaml";
+	std::filesystem::path m_UserDetailsPath = "UserDetails.yaml";
 
 	Walnut::Buffer m_ScratchBuffer;
 
 	float m_ColorBuffer[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-	std::string m_Username;
+	std::string m_Username, m_Email, m_Password, m_AuthToken, m_SelectedUser;
 	uint32_t m_Color = 0xffffffff;
 
 	std::map<std::string, UserInfo> m_ConnectedClients;
 	bool m_ConnectionModalOpen = false;
 	bool m_ShowSuccessfulConnectionMessage = false;
+	bool m_Disconnect = false;
 };

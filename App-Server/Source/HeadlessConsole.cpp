@@ -12,7 +12,7 @@ HeadlessConsole::~HeadlessConsole()
 {
 	m_InputThreadRunning = false;
 	if (m_InputThread.joinable())
-		m_InputThread.join();
+		m_InputThread.detach();
 }
 
 void HeadlessConsole::ClearLog()

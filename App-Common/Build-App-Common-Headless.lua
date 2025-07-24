@@ -16,13 +16,15 @@ project "App-Common-Headless"
 
       "../Walnut/vendor/spdlog/include",
 
-      "../vendor/GameNetworkingSockets/include"
+      "../vendor/GameNetworkingSockets/include",
+      "../vendor/curl/include"
    }
 
    links
    {
        "Walnut-Headless",
        "Walnut-Networking",
+       "Curl"
    }
 
    targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
@@ -48,3 +50,9 @@ project "App-Common-Headless"
       runtime "Release"
       optimize "On"
       symbols "Off"
+   
+   filter "action:vs*"
+    buildoptions { "/utf-8" }
+
+   filter { "toolset:gcc or toolset:clang" }
+    buildoptions { "-finput-charset=UTF-8" }

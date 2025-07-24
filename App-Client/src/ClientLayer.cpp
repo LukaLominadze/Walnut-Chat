@@ -27,6 +27,7 @@ void ClientLayer::OnAttach()
 	m_Console.SetMessageSendCallback([this](std::string_view message) { SendChatMessage(message); });
 
 	LoadConnectionDetails(m_ConnectionDetailsFilePath);
+	LoadUserDetails(m_UserDetailsPath);
 }
 
 void ClientLayer::OnDetach()
@@ -39,6 +40,10 @@ void ClientLayer::OnDetach()
 
 void ClientLayer::OnUIRender()
 {
+	if (m_Disconnect) {
+		m_Client->Disconnect();
+		m_Disconnect = false;
+	}
 	UI_ConnectionModal();
 	
 	m_Console.OnUIRender();
@@ -65,20 +70,16 @@ void ClientLayer::UI_ConnectionModal()
 	m_ConnectionModalOpen = ImGui::BeginPopupModal("Connect to server", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 	if (m_ConnectionModalOpen)
 	{
-		ImGui::Text("Your Name");
-		ImGui::InputText("##username", &m_Username);
-
-		ImGui::Text("Pick a color");
-		ImGui::SameLine();
-		ImGui::ColorEdit4("##color", m_ColorBuffer);
+		ImGui::Text("Email");
+		ImGui::InputText("##email", &m_Email);
+		ImGui::Text("Password");
+		ImGui::InputText("##password", &m_Password);
 
 		ImGui::Text("Server Address");
 		ImGui::InputText("##address", &m_ServerIP);
 		ImGui::SameLine();
 		if (ImGui::Button("Connect"))
 		{
-			m_Color = IM_COL32(m_ColorBuffer[0] * 255.0f, m_ColorBuffer[1] * 255.0f, m_ColorBuffer[2] * 255.0f, m_ColorBuffer[3] * 255.0f);
-
 			if (Walnut::Utils::IsValidIPAddress(m_ServerIP))
 			{
 				m_Client->ConnectToServer(m_ServerIP);
@@ -106,12 +107,10 @@ void ClientLayer::UI_ConnectionModal()
 			// Send username
 			Walnut::BufferStreamWriter stream(m_ScratchBuffer);
 			stream.WriteRaw<PacketType>(PacketType::ClientConnectionRequest);
-			stream.WriteRaw<uint32_t>(m_Color); // Color
-			stream.WriteString(m_Username); // Username
+			stream.WriteString(m_Email);
+			stream.WriteString(m_Password);
 
 			m_Client->SendBuffer(stream.GetBuffer());
-
-			SaveConnectionDetails(m_ConnectionDetailsFilePath);
 
 			// Wait for response
 			ImGui::CloseCurrentPopup();
@@ -137,15 +136,22 @@ void ClientLayer::UI_ClientList()
 	ImGui::Begin("Users Online");
 	ImGui::Text("Online: %d", m_ConnectedClients.size());
 
-	static bool selected = false;
+	static std::string selected("");
 	for (const auto& [username, clientInfo] : m_ConnectedClients)
 	{
 		if (username.empty())
 			continue;
 
-		ImGui::PushStyleColor(ImGuiCol_Text, ImColor(clientInfo.Color).Value);
-		ImGui::Selectable(username.c_str(), &selected);
-		ImGui::PopStyleColor();
+		if (ImGui::Selectable(username.c_str(), selected == username)) {
+			if (selected == username)
+				selected = "";
+			else
+			{
+				m_SelectedUser = username;
+				SendGetChatHistoryRequest(m_SelectedUser);
+				selected = username;
+			}
+		}
 	}
 	ImGui::End();
 }
@@ -170,141 +176,127 @@ void ClientLayer::OnDataReceived(const Walnut::Buffer buffer)
 
 	switch (type)
 	{
-	case PacketType::Message:
-	{
-		std::string fromUsername, message;
-		stream.ReadString(fromUsername);
-		stream.ReadString(message);
-
-		// Find user
-		if (m_ConnectedClients.contains(fromUsername))
+		case PacketType::ClientConnectionRequest:
 		{
-			const auto& clientInfo = m_ConnectedClients.at(fromUsername);
-			m_Console.AddTaggedMessageWithColor(clientInfo.Color, fromUsername, message);
+			bool requestStatus;
+			stream.ReadRaw<bool>(requestStatus);
+			if (requestStatus)
+			{
+				std::string authToken;
+				if (!stream.ReadString(authToken)) {
+					m_Disconnect = true;
+					break;
+				}
+				UserInfo clientDetails;
+				stream.ReadObject(clientDetails);
+				if (clientDetails.Username.length() == std::string::npos) {
+					m_Disconnect = true;
+					break;
+				}
+
+				// Defer connection message to after message history is received
+				m_ShowSuccessfulConnectionMessage = true;
+				m_Console.AddItalicMessageWithColor(0xff8a8a8a, "Successfully connected to {}", m_ServerIP);
+
+				m_Username = clientDetails.Username;
+				m_AuthToken = authToken;
+
+				SaveConnectionDetails(m_ConnectionDetailsFilePath);
+				SaveUserDetails(m_UserDetailsPath);
+			}
+			else
+			{
+				m_Console.AddItalicMessageWithColor(0xfffa4a4a, "Server rejected connection with username {}", m_Username);
+				m_Disconnect = true;
+			}
+			break;
 		}
-		else if (fromUsername == "SERVER") // special message from server
+		case PacketType::ClientConnect:
 		{
-			m_Console.AddTaggedMessage(fromUsername, message);
+			UserInfo newClient;
+			stream.ReadObject(newClient);
+
+			m_ConnectedClients[newClient.Username] = newClient;
+			m_Console.AddItalicMessage("Welcome {}!", newClient.Username);
+
+			break;
 		}
-		else
+		case PacketType::ClientDisconnect:
 		{
-			std::cout << "[ERROR] Message from unknown user? This shouldn't happen..." << std::endl;
-			// display message anyway
-			m_Console.AddTaggedMessage(fromUsername, message);
-		}
+			UserInfo disconnectedClient;
+			stream.ReadObject(disconnectedClient);
 
-		break;
-	}
-	case PacketType::ClientConnectionRequest:
-	{
-		bool requestStatus;
-		stream.ReadRaw<bool>(requestStatus);
-		if (requestStatus)
+			if (m_ConnectedClients.contains(disconnectedClient.Username)) {
+				m_ConnectedClients.erase(disconnectedClient.Username);
+				m_Console.AddItalicMessage("{} disconnected!", disconnectedClient.Username);
+			}
+
+			break;
+		}
+		case PacketType::ClientList:
 		{
-			// Defer connection message to after message history is received
-			m_ShowSuccessfulConnectionMessage = true;
-			// m_Console.AddItalicMessageWithColor(0xff8a8a8a, "Successfully connected to {} with username {}", m_ServerIP, m_Username);
+			std::vector<UserInfo> clientList;
+			stream.ReadArray(clientList);
+
+			// Update our client list
+			m_ConnectedClients.clear();
+			for (const auto& client : clientList)
+				m_ConnectedClients[client.Username] = client;
+
+			break;
 		}
-		else
+		case PacketType::ClientSessionRenewResponse:
 		{
-			m_Console.AddItalicMessageWithColor(0xfffa4a4a, "Server rejected connection with username {}", m_Username);
+			stream.ReadString(m_AuthToken);
+			break;
 		}
-		break;
-	}
-	case PacketType::ConnectionStatus:
-		break;
-	case PacketType::ClientList:
-	{
-		std::vector<UserInfo> clientList;
-		stream.ReadArray(clientList);
-
-		// Update our client list
-		m_ConnectedClients.clear();
-		for (const auto& client : clientList)
-			m_ConnectedClients[client.Username] = client;
-
-		break;
-	}
-	case PacketType::ClientConnect:
-	{
-		UserInfo newClient;
-		stream.ReadObject(newClient);
-
-		m_ConnectedClients[newClient.Username] = newClient;
-		m_Console.AddItalicMessageWithColor(newClient.Color, "Welcome {}!", newClient.Username);
-
-		break;
-	}
-	case PacketType::ClientUpdate:
-		break;
-	case PacketType::ClientDisconnect:
-	{
-		UserInfo disconnectedClient;
-		stream.ReadObject(disconnectedClient);
-
-		m_ConnectedClients.erase(disconnectedClient.Username);
-		m_Console.AddItalicMessageWithColor(disconnectedClient.Color, "Goodbye {}!", disconnectedClient.Username);
-		break;
-	}
-	case PacketType::ClientUpdateResponse:
-		break;
-	case PacketType::MessageHistory:
-	{
-		std::vector<ChatMessage> messageHistory;
-		stream.ReadArray(messageHistory);
-		for (const auto& message : messageHistory)
+		case PacketType::MessageHistory:
 		{
-			// find user color if connected
-			uint32_t userColor = 0xffffffff;
-			if (m_ConnectedClients.contains(message.Username))
-				userColor = m_ConnectedClients.at(message.Username).Color;
-
-			m_Console.AddTaggedMessageWithColor(userColor, message.Username, message.Message);
+			std::vector<ChatMessage> messages;
+			stream.ReadArray(messages);
+			if (messages.size() > 0) {
+				for (const auto& message : messages) {
+					m_Console.AddTaggedMessage(message.Username, message.Message);
+				}
+			}
+			break;
 		}
-
-		if (m_ShowSuccessfulConnectionMessage)
+		case PacketType::Message:
 		{
-			m_ShowSuccessfulConnectionMessage = false;
-			m_Console.AddItalicMessageWithColor(0xff8a8a8a, "Successfully connected to {} with username {}", m_ServerIP, m_Username);
+			ChatMessage message;
+			stream.ReadObject(message);
+			m_Console.AddTaggedMessage(message.Username, message.Message);
+			break;
 		}
-
-		break;
-	}
-	case PacketType::ServerShutdown:
-	{
-		m_Console.AddItalicMessage("Server is shutting down... goodbye!");
-		m_Client->Disconnect();
-		break;
-	}
-	case PacketType::ClientKick:
-	{
-		m_Console.AddItalicMessage("You have been kicked by server!");
-		std::string reason;
-		stream.ReadString(reason);
-		if (!reason.empty())
-			m_Console.AddItalicMessage("Reason: {}", reason);
-
-		m_Client->Disconnect();
-		break;
-	}
-	default:
-		break;
 	}
 }
 
 void ClientLayer::SendChatMessage(std::string_view message)
 {
 	std::string messageToSend(message);
-	if (IsValidMessage(messageToSend))
+	if (IsValidMessage(messageToSend) && !m_SelectedUser.empty())
 	{
 		Walnut::BufferStreamWriter stream(m_ScratchBuffer);
 		stream.WriteRaw<PacketType>(PacketType::Message);
+		stream.WriteString(m_AuthToken);
+		stream.WriteString(m_Username);
+		stream.WriteString(m_SelectedUser);
 		stream.WriteString(messageToSend);
 		m_Client->SendBuffer(stream.GetBuffer());
 
 		// echo in own console
 		m_Console.AddTaggedMessageWithColor(m_Color | 0xff000000, m_Username, messageToSend);
 	}
+}
+
+void ClientLayer::SendGetChatHistoryRequest(const std::string& receiver)
+{
+	m_Console.ClearLog();
+	Walnut::BufferStreamWriter stream(m_ScratchBuffer);
+	stream.WriteRaw<PacketType>(PacketType::MessageHistory);
+	stream.WriteString(m_AuthToken);
+	stream.WriteString(receiver);
+	m_Client->SendBuffer(stream.GetBuffer());
 }
 
 void ClientLayer::SaveConnectionDetails(const std::filesystem::path& filepath)
@@ -315,7 +307,8 @@ void ClientLayer::SaveConnectionDetails(const std::filesystem::path& filepath)
 		out << YAML::Key << "ConnectionDetails" << YAML::Value;
 
 		out << YAML::BeginMap;
-		out << YAML::Key << "Username" << YAML::Value << m_Username;
+		out << YAML::Key << "Email" << YAML::Value << m_Email;
+		out << YAML::Key << "Password" << YAML::Value << m_Password;
 		out << YAML::Key << "Color" << YAML::Value << m_Color;
 		out << YAML::Key << "ServerIP" << YAML::Value << m_ServerIP;
 		out << YAML::EndMap;
@@ -347,16 +340,59 @@ bool ClientLayer::LoadConnectionDetails(const std::filesystem::path& filepath)
 	if (!rootNode)
 		return false;
 
-	m_Username = rootNode["Username"].as<std::string>();
-
-	m_Color = rootNode["Color"].as<uint32_t>();
-	ImVec4 color = ImColor(m_Color).Value;
-	m_ColorBuffer[0] = color.x;
-	m_ColorBuffer[1] = color.y;
-	m_ColorBuffer[2] = color.z;
-	m_ColorBuffer[3] = color.w;
-
+	m_Email = rootNode["Email"].as<std::string>();
+	m_Password = rootNode["Password"].as<std::string>();
 	m_ServerIP = rootNode["ServerIP"].as<std::string>();
 
 	return true;
 }
+
+void ClientLayer::SaveUserDetails(const std::filesystem::path& filepath)
+{
+	YAML::Emitter out;
+	{
+		out << YAML::BeginMap; // Root
+		out << YAML::Key << "UserDetails" << YAML::Value;
+
+		out << YAML::BeginMap;
+		out << YAML::Key << "Username" << YAML::Value << m_Username;
+		out << YAML::Key << "AuthToken" << YAML::Value << m_AuthToken;
+		out << YAML::EndMap;
+
+		out << YAML::EndMap; // Root
+	}
+
+	std::ofstream fout(filepath);
+	fout << out.c_str();
+}
+
+bool ClientLayer::LoadUserDetails(const std::filesystem::path& filepath)
+{
+	if (!std::filesystem::exists(filepath))
+		return false;
+
+	YAML::Node data;
+	try
+	{
+		data = YAML::LoadFile(filepath.string());
+	}
+	catch (YAML::ParserException e)
+	{
+		std::cout << "[ERROR] Failed to load message history " << filepath << std::endl << e.what() << std::endl;
+		return false;
+	}
+
+	auto rootNode = data["UserDetails"];
+	if (!rootNode)
+		return false;
+
+	if (!m_ConnectedClients.contains(m_Username))
+		return false;
+
+	auto& clientDetails = m_ConnectedClients.at(m_Username);
+
+	m_AuthToken = rootNode["AuthToken"].as<std::string>();
+
+	return true;
+}
+

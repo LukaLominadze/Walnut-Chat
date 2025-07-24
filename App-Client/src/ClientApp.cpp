@@ -1,4 +1,4 @@
-#include "Walnut/ApplicationGUI.h"
+﻿#include "Walnut/ApplicationGUI.h"
 #include "Walnut/EntryPoint.h"
 
 #include "ClientLayer.h"

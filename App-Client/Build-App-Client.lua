@@ -14,6 +14,9 @@ project "App-Client"
       "../Walnut/vendor/imgui",
       "../Walnut/vendor/glfw/include",
       "../Walnut/vendor/glm",
+      "../Walnut/vendor/yaml-cpp/include",
+      "../Walnut/vendor/nativefiledialog/src/include",
+      "../Walnut/vendor/static-bin2header/src",
 
       "../Walnut/Walnut/Source",
       "../Walnut/Walnut/Platform/GUI",
@@ -32,6 +35,8 @@ project "App-Client"
        "App-Common",
 
        "yaml-cpp",
+       "nfd",
+       "Bin2Header",
    }
 
    	defines
@@ -50,16 +55,25 @@ project "App-Client"
 	  {
 	    '{COPY} "../%{WalnutNetworkingBinDir}/GameNetworkingSockets.dll" "%{cfg.targetdir}"',
 	    '{COPY} "../%{WalnutNetworkingBinDir}/libcrypto-3-x64.dll" "%{cfg.targetdir}"',
-	    '{COPY} "../%{WalnutNetworkingBinDir}/libprotobufd.dll" "%{cfg.targetdir}"',
 	  }
 
    filter "configurations:Debug"
       defines { "WL_DEBUG" }
+      links { "../Walnut/vendor/static-bin2header/bin/" .. outputdir .. "/Bin2Header/Bin2Header_d.lib" }
+      postbuildcommands 
+	  {
+	    '{COPY} "../%{WalnutNetworkingBinDir}/libprotobufd.dll" "%{cfg.targetdir}"'
+	  }
       runtime "Debug"
       symbols "On"
 
    filter "configurations:Release"
       defines { "WL_RELEASE" }
+      links { "../Walnut/vendor/static-bin2header/bin/" .. outputdir .. "/Bin2Header/Bin2Header.lib" }
+      postbuildcommands 
+	  {
+	    '{COPY} "../%{WalnutNetworkingBinDir}/libprotobuf.dll" "%{cfg.targetdir}"'
+	  }
       runtime "Release"
       optimize "On"
       symbols "On"
@@ -67,6 +81,17 @@ project "App-Client"
    filter "configurations:Dist"
       kind "WindowedApp"
       defines { "WL_DIST" }
+      links { "../Walnut/vendor/static-bin2header/bin/" .. outputdir .. "/Bin2Header/Bin2Header.lib" }
+      postbuildcommands 
+	  {
+	    '{COPY} "../%{WalnutNetworkingBinDir}/libprotobuf.dll" "%{cfg.targetdir}"'
+	  }
       runtime "Release"
       optimize "On"
       symbols "Off"
+   
+   filter "action:vs*"
+      buildoptions { "/utf-8" }
+
+   filter { "toolset:gcc or toolset:clang" }
+      buildoptions { "-finput-charset=UTF-8" }

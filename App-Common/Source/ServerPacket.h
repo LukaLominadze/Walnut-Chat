@@ -112,6 +112,8 @@ enum class PacketType : uint16_t
 	// User has been kicked from server
 	// 1. String reason, could be empty string
 	ClientKick = 11,
+
+	ClientSessionRenewResponse = 12,
 };
 
 std::string_view PacketTypeToString(PacketType type);

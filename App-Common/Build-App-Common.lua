@@ -12,6 +12,9 @@ project "App-Common"
       "../Walnut/vendor/imgui",
       "../Walnut/vendor/glfw/include",
       "../Walnut/vendor/glm",
+      "../Walnut/vendor/yaml-cpp/include",
+      "../Walnut/vendor/nativefiledialog/src/include",
+      "../Walnut/vendor/static-bin2header/src",
 
       "../Walnut/Walnut/Source",
       "../Walnut-Networking/Source",
@@ -19,13 +22,17 @@ project "App-Common"
       "%{IncludeDir.VulkanSDK}",
       "../Walnut/vendor/spdlog/include",
 
-      "../Walnut-Networking/vendor/GameNetworkingSockets/include"
+      "../Walnut-Networking/vendor/GameNetworkingSockets/include",
+      "../vendor/curl/include"
    }
 
    links
    {
        "Walnut",
        "Walnut-Networking",
+       "Curl",
+       "Bin2Header",
+       "nfd",
    }
 
    targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
@@ -51,3 +58,9 @@ project "App-Common"
       runtime "Release"
       optimize "On"
       symbols "Off"
+   
+   filter "action:vs*"
+      buildoptions { "/utf-8" }
+
+   filter { "toolset:gcc or toolset:clang" }
+      buildoptions { "-finput-charset=UTF-8" }
