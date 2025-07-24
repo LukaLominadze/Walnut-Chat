@@ -89,15 +89,17 @@ void ServerLayer::OnDataReceived(const Walnut::ClientInfo& clientInfo, const Wal
 		case PacketType::ClientConnectionRequest: {
 			std::string email;
 			std::string password;
+			uint32_t color;
 			if (!stream.ReadString(email)) {
 				return;
 			}
 			if (!stream.ReadString(password)) {
 				return;
 			}
+			stream.ReadRaw<uint32_t>(color);
 			
 			std::async(std::launch::async,
-				[this, email, password, clientInfo]() {
+				[this, email, password, color, clientInfo]() {
 
 				nlohmann::json jsonData;
 				jsonData["email"] = email;
@@ -126,6 +128,7 @@ void ServerLayer::OnDataReceived(const Walnut::ClientInfo& clientInfo, const Wal
 
 				UserInfo& client = m_ConnectedClients[clientInfo.ID];
 				client.Username = username;
+				client.Color = color;
 				m_ConnectedClientIDs[username] = clientInfo.ID;
 
 				SendClientConnectionRequestResponse(clientInfo, isValidUsername, client, authToken);

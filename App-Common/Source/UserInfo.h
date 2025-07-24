@@ -6,15 +6,18 @@
 struct UserInfo
 {
 	std::string Username;
+	uint32_t Color;
 
 	static void Serialize(Walnut::StreamWriter* serializer, const UserInfo& instance)
 	{
 		serializer->WriteString(instance.Username);
+		serializer->WriteRaw(instance.Color);
 	}
 
 	static void Deserialize(Walnut::StreamReader* deserializer, UserInfo& instance)
 	{
 		deserializer->ReadString(instance.Username);
+		deserializer->ReadRaw(instance.Color);
 	}
 };
 

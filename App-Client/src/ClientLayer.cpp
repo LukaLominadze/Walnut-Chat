@@ -74,12 +74,17 @@ void ClientLayer::UI_ConnectionModal()
 		ImGui::InputText("##email", &m_Email);
 		ImGui::Text("Password");
 		ImGui::InputText("##password", &m_Password);
+		ImGui::Text("Pick a color");
+		ImGui::SameLine();
+		ImGui::ColorEdit4("##color", m_ColorBuffer);
 
 		ImGui::Text("Server Address");
 		ImGui::InputText("##address", &m_ServerIP);
 		ImGui::SameLine();
 		if (ImGui::Button("Connect"))
 		{
+			m_Color = IM_COL32(m_ColorBuffer[0] * 255.0f, m_ColorBuffer[1] * 255.0f, m_ColorBuffer[2] * 255.0f, m_ColorBuffer[3] * 255.0f);
+
 			if (Walnut::Utils::IsValidIPAddress(m_ServerIP))
 			{
 				m_Client->ConnectToServer(m_ServerIP);
@@ -109,6 +114,7 @@ void ClientLayer::UI_ConnectionModal()
 			stream.WriteRaw<PacketType>(PacketType::ClientConnectionRequest);
 			stream.WriteString(m_Email);
 			stream.WriteString(m_Password);
+			stream.WriteRaw<uint32_t>(m_Color); // Color
 
 			m_Client->SendBuffer(stream.GetBuffer());
 
@@ -256,7 +262,8 @@ void ClientLayer::OnDataReceived(const Walnut::Buffer buffer)
 			stream.ReadArray(messages);
 			if (messages.size() > 0) {
 				for (const auto& message : messages) {
-					m_Console.AddTaggedMessage(message.Username, message.Message);
+					uint32_t color = m_ConnectedClients[message.Username].Color;
+					m_Console.AddTaggedMessageWithColor(color, message.Username, message.Message);
 				}
 			}
 			break;
@@ -265,7 +272,8 @@ void ClientLayer::OnDataReceived(const Walnut::Buffer buffer)
 		{
 			ChatMessage message;
 			stream.ReadObject(message);
-			m_Console.AddTaggedMessage(message.Username, message.Message);
+			uint32_t color = m_ConnectedClients[message.Username].Color;
+			m_Console.AddTaggedMessageWithColor(color, message.Username, message.Message);
 			break;
 		}
 	}
@@ -342,6 +350,12 @@ bool ClientLayer::LoadConnectionDetails(const std::filesystem::path& filepath)
 
 	m_Email = rootNode["Email"].as<std::string>();
 	m_Password = rootNode["Password"].as<std::string>();
+	m_Color = rootNode["Color"].as<uint32_t>();
+	ImVec4 color = ImColor(m_Color).Value;
+	m_ColorBuffer[0] = color.x;
+	m_ColorBuffer[1] = color.y;
+	m_ColorBuffer[2] = color.z;
+	m_ColorBuffer[3] = color.w;
 	m_ServerIP = rootNode["ServerIP"].as<std::string>();
 
 	return true;
