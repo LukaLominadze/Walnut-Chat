@@ -8,9 +8,15 @@ This was built as a demonstration of networking in C++ for a video on my YouTube
 ![WalnutExample](https://hazelengine.com/images/WalnutChat.jpg)
 _<center>Walnut Chat Client</center>_
 
+## Dependencies
+### Api
+you will need dotnet to be able to generate and run the web api for the server, if you are using an IDE (like Visual Studio) you will need the tools to be able to work with ASP.NET Core Web Api
+You will also need MySQL.
+
 ## Building
 ### Windows
-Running `scripts/Setup.bat` will generate both `Walnut-Chat.sln` and `Walnut-Chat-Headless.sln` solution files for Visual Studio 2022. The headless variant will only include the server, running in the headless config (no GUI console app), and the `Walnut-Chat` solution can be used to build GUI versions of the client and/or server.
+Running `scripts/Setup.bat` will generate `Walnut-Chat.sln` solution file for Visual Studio 2022.
+Make sure to change the connection string in "Walnut-Chat-Api\Walnut.Api\appsettings.json" to your databases connection string.
 
 ### Linux (tested on Ubuntu 22)
-Run `scripts/Setup.sh` to generate make files for the headless server project. You can then call `make` in the root directory of the repository to build.
+Currenty developing support for Linux...
