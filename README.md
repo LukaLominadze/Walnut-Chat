@@ -13,6 +13,9 @@ _<center>Walnut Chat Client</center>_
 (you will need dotnet to be able to generate and run the web api for the server, if you are using an IDE (like Visual Studio) you will need the tools to be able to work with ASP.NET Core Web Api)
 - MySQL
 
+## Cloning
+Clone the repository with ```git clone --recursive https://github.com/LukaLominadze/Walnut-Chat```
+
 ## Building
 ### Windows
 Running `scripts/Setup.bat` will generate `Walnut-Chat.sln` solution file for Visual Studio 2022.
