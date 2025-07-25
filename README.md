@@ -16,7 +16,7 @@ _<center>Walnut Chat Client</center>_
 ## Building
 ### Windows
 Running `scripts/Setup.bat` will generate `Walnut-Chat.sln` solution file for Visual Studio 2022.
-Make sure to change the connection string in "Walnut-Chat-Api\Walnut.Api\appsettings.json" to your databases connection string.
+Make sure to change the connection string in "Walnut-Chat-Api\Walnut.Api\appsettings.json" to your database's connection string.
 
 ### Linux (tested on Ubuntu 22)
 Currenty developing support for Linux...
