@@ -9,9 +9,9 @@ This was built as a demonstration of networking in C++ for a video on my YouTube
 _<center>Walnut Chat Client</center>_
 
 ## Dependencies
-### Api
-you will need dotnet to be able to generate and run the web api for the server, if you are using an IDE (like Visual Studio) you will need the tools to be able to work with ASP.NET Core Web Api
-You will also need MySQL.
+- Api
+(you will need dotnet to be able to generate and run the web api for the server, if you are using an IDE (like Visual Studio) you will need the tools to be able to work with ASP.NET Core Web Api)
+- MySQL
 
 ## Building
 ### Windows
