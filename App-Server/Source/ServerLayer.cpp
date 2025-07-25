@@ -16,6 +16,14 @@
 #include <iostream>
 #include <fstream>
 
+#if WL_PLATFORM_WINDOWS
+#include <windows.h>
+
+PROCESS_INFORMATION gProcessInfo = {};
+#elif WL_PLATFORM_LINUX
+// TODO:
+#endif
+
 void ServerLayer::OnAttach()
 {
 	const int Port = 8192;
@@ -36,6 +44,33 @@ void ServerLayer::OnAttach()
 
 	m_HttpClient.AddHeader("Content-Type: application/json");
 	m_HttpClient.AddHeader("Accept: application/json");
+
+	// TODO: make this cross-platform and cleaner
+#if WL_PLATFORM_WINDOWS
+	STARTUPINFOA si = { sizeof(STARTUPINFOA) };
+	ZeroMemory(&gProcessInfo, sizeof(PROCESS_INFORMATION));
+
+	std::string command = "dotnet run --project Walnut.Api --launch-profile https";
+
+	BOOL success = CreateProcessA(
+		nullptr,                      // lpApplicationName
+		&command[0],                  // lpCommandLine
+		nullptr,                      // lpProcessAttributes
+		nullptr,                      // lpThreadAttributes
+		FALSE,                        // bInheritHandles
+		CREATE_NEW_CONSOLE,          // dwCreationFlags
+		nullptr,                      // lpEnvironment
+		"../Walnut-Chat-Api",           // lpCurrentDirectory
+		&si,                          // lpStartupInfo
+		&gProcessInfo                 // lpProcessInformation
+	);
+
+	if (!success) {
+		std::cerr << "CreateProcess failed. Error: " << GetLastError() << "\n";
+	}
+
+	std::cout << "Process started with PID: " << gProcessInfo.dwProcessId << "\n";
+#endif
 }
 
 void ServerLayer::OnDetach()
@@ -45,6 +80,14 @@ void ServerLayer::OnDetach()
 	while (!m_Server->HasShutdown());
 	m_ScratchBuffer.Release();
 	curl_global_cleanup();
+#if WL_PLATFORM_WINDOWS
+	if (gProcessInfo.hProcess) {
+		TerminateProcess(gProcessInfo.hProcess, 0);
+		CloseHandle(gProcessInfo.hProcess);
+		CloseHandle(gProcessInfo.hThread);
+		std::cout << "Process terminated.\n";
+	}
+#endif
 }
 
 void ServerLayer::OnUpdate(float ts)
